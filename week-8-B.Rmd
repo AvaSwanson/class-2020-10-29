@@ -8,6 +8,8 @@ knitr::opts_chunk$set(echo = FALSE)
 library(PPBDS.data)
 library(rstanarm)
 library(tidyverse)
+library(ggthemes)
+library(patchwork)
 
 # Recall that Enos (2014) actually looks at a measure of change in attitude
 # toward immigration, rather than simply at the ending attitude. Let's create
@@ -32,27 +34,89 @@ Today, we will be considering `att_chg` as a function of `treatment`.
 
 * Create the mathematical formula for that model here.
 
+$$ attchg_i = \beta_1 x_{t,i} + \beta_2 x_{c,i} + \epsilon_i$$
+
 * Describe the ideal Preceptor Table.
+
+In an ideal Preceptor Table we would know the outcome for treatment and control for each individual. 
 
 * Write a few sentences about whether or not our data will allow us to answer this question.
 
-
+To an extent. It could predict what his general attitude would be over time. 
 
 ## Scene 2
 
 **Prompt:** There are two ways to interpret our question. The first involves our expectation. We can also think of this as the long-term average, if we did the same experiment over and over again. (Assume that Preceptor is always assigned to the treatment.) What is your posterior probability distribution for Preceptor's *expected* `att_chg`?
 
+```{r}
+fit_att_chg <- stan_glm(att_chg ~ treatment - 1, 
+                       data = week_8,
+                       family = gaussian(),
+                       refresh = 0)
+
+fit_att_chg
+
+fit_att_chg %>%
+  as_tibble() %>% 
+  ggplot(aes(x = treatmentTreated, 
+             y = after_stat(count/sum(count)))) +
+  geom_density(fill = "blue", color = "white", alpha = 0.5) +
+  labs(title = "Posterior Density Distribution",
+         subtitle = 
+         "Average treatment effect on immigration attitude",
+         x = "Average Attitude Change",
+         y = "Density") +
+  theme_bw()
+```
 
 
 ## Scene 3
 
 **Prompt:** The second way to interpret the question is with regard to a single individual. What will happen to Preceptor next week? Provide a Posterior Predictive Distribution for what you predict will be Preceptor's `att_chg` after treatment.
 
+```{r}
+new_obs <- tibble(treatment = factor("Treated", 
+                                      levels = c("Treated", "Control")))
+
+fit_att_chg <- stan_glm(att_chg ~ treatment - 1, 
+                       data = week_8,
+                       family = gaussian(),
+                       refresh = 0)
+
+pp <- posterior_predict(fit_att_chg, 
+                        newdata = new_obs) %>%
+  as_tibble() %>% 
+  mutate(across(everything(), as.numeric))
+  
+head(pp)
+
+pp %>%
+  ggplot(aes(x = `1`)) +
+  geom_histogram(aes(y = after_stat(count/sum(count))),
+                   alpha = 0.5, 
+                   bins = 100, 
+                   position = "identity",
+                 fill = "blue") +
+  labs(title = "Posterior Predictive Distribution",
+         subtitle = 
+         "Average treatment effect on immigration attitude",
+         x = "Average Attitude Change",
+         y = "Density") +
+  theme_bw()
+```
 
 
 ## Challenge Problem
 
 Create the posterior distribution for the average treatment effect of `treatment` within subsets of the data defined by `liberal` and by `gender`.  In other words, there should be 4 plots total: `liberal == FALSE`, `liberal == TRUE`, `gender == "Male"` and `gender == "Female"`. Put all these posteriors in the same graphic. (One approach is to use the **patchwork** package.) The elegant approach is to create a function which takes a tibble and a restriction, and then returns the plot.
+```{r}
+function(){
+  fit_att_chg <- stan_glm(att_chg ~ treatment - 1, 
+                       data = week_8,
+                       family = gaussian(),
+                       refresh = 0)
+}
+```
 
 
 
